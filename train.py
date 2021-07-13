@@ -108,7 +108,7 @@ if args.only_gcn:
     model.fit(features, perturbed_adj, labels, idx_train, idx_val, verbose=True, train_iters=args.epochs)
     model.test(idx_test)
 elif args.pre == 'big':
-    labels_t = train_labels(perturbed_adj.toarray(), 7, iterations=1)
+    labels_t = train_labels(perturbed_adj.toarray(), 7, iterations=100)
     print(labels_t, len(labels_t), labels, len(labels))
     
     #print(features, type(features))
@@ -121,7 +121,7 @@ elif args.pre == 'big':
 
     prognn = ProGNN(model, args, device)
     prognn.fit(features, perturbed_adj, labels_t, idx_train, idx_val)
-    prognn.test(features, labels, idx_test)
+    prognn.test(features, labels_t, idx_test)
     
 else:
     perturbed_adj, features, labels = preprocess(perturbed_adj, features, labels, preprocess_adj=False, device=device)

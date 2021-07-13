@@ -13,6 +13,8 @@ import numpy as np
 import pickle
 import json
 import scipy.sparse as sp
+from deeprobust.graph.data import Dataset
+from collections import Counter
 
 # 資料前處理
 def load_npz(file_name):
@@ -33,8 +35,8 @@ def load_npz(file_name):
     features = sp.csr_matrix(features, dtype=np.float32)
     return adj, features, labels
     
-def get_adj():
-    adj, features, labels = load_npz('../../tmp/cora_meta_adj_0.15.npz')
+def get_adj(filename):
+    adj, features, labels = load_npz(filename)
     adj = adj + adj.T
     adj = adj.tolil()
     adj[adj > 1] = 1
@@ -138,13 +140,31 @@ def train_labels(A, C, iterations = 100):
         print('At step %5i/%5i log_likelihood is %5.3f'%(n, iterations, ll))
     return np.argmax(F,1) #F
 
+def train(A, C, iterations = 100):
+    # initialize an F
+    N = A.shape[0]
+    F = np.random.rand(N,C)
+
+    for n in range(iterations):
+        for person in range(N):
+            grad = gradient(F, A, person)
+
+            F[person] += 0.005*grad
+
+            F[person] = np.maximum(0.001, F[person]) # F should be nonnegative
+        ll = log_likelihood(F, A)
+        print('At step %5i/%5i log_likelihood is %5.3f'%(n, iterations, ll))
+    return F
+
 if __name__ == "__main__":
     # adj = np.load('data/adj.npy')
 
     #adj = np.load('adj.npy')
     #print("adj", adj, type(adj))
-    npz_adj = np.load('../../tmp/cora_meta_adj_0.15.npz')
-    attacked_adj = sp.load_npz('../../tmp/cora_meta_adj_0.15.npz')
+    filename = '../../tmp/cora_meta_adj_0.15.npz'
+    
+    npz_adj = np.load(filename)
+    attacked_adj = sp.load_npz(filename)
     attacked_adj = attacked_adj.toarray()
     print(attacked_adj)
     for k in npz_adj.files:
@@ -160,15 +180,28 @@ if __name__ == "__main__":
     #print("indptr", npz_adj['indptr'], len(npz_adj['indptr']))
     
     ## 載入Graph
-    adj, features, labels = get_adj()
+    # adj, features, labels = get_adj(filename)
+    dataset = 'cora'
+    data = Dataset(root='/tmp/', name=dataset, setting='prognn')
+    adj, features, labels = data.adj, data.features, data.labels
     adj = adj.toarray()
     print("cora under metattack's adj : \n", adj, type(adj), adj.shape )
+    print("cora ori labels ", labels)
     
-    
-    F = train_labels(adj, 7, iterations=1) #將Graph分成n群 
+    ## Run bigCLAM
+    F = train(adj, 7, iterations=100) #將Graph分成n群 
     print("F", F, "\n", np.argmax(F,1), len(adj[0]), len(np.argmax(F,1)))
     print("data type", type(F), F.shape)
-    
     F_argmax = np.argmax(F,1) #F_argmax代表每個node屬於哪一群
+    
+    
+    ## distribution analysis
+    result = Counter(labels)
+    print("origin: ", result)
+    big_result = Counter(F_argmax)
+    print("bigCLAM: ", big_result)
+    
+    print(labels[:150])
+    print(F_argmax[:150])
     
     
